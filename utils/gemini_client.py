@@ -18,9 +18,9 @@ class GeminiClient:
         """Configure the Gemini client"""
         try:
             genai.configure(api_key=self.api_key)
-            self.model = genai.GenerativeModel('gemini-pro')
+            self.model = genai.GenerativeModel('gemini-2.0-flash')
         except Exception as e:
-            st.error(f"❌ Failed to configure Gemini API: {str(e)}")
+            st.error(f"Failed to configure Gemini API: {str(e)}")
             raise
     
     def generate_response(self, prompt, context=""):

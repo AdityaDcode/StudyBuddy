@@ -19,33 +19,39 @@ class PDFProcessor:
             str: Extracted text from PDF
         """
         try:
-            # Create a BytesIO object from uploaded file
+            
+            uploaded_file.seek(0)
+            
+            
             pdf_bytes = BytesIO(uploaded_file.read())
             
-            # Extract text using pdfplumber
+            
             extracted_text = ""
             
             with pdfplumber.open(pdf_bytes) as pdf:
                 total_pages = len(pdf.pages)
                 
-                # Create progress bar
-                progress_bar = st.progress(0)
-                status_text = st.empty()
+                
+                if not st.session_state.get('pdf_processed', False):
+                    progress_bar = st.progress(0)
+                    status_text = st.empty()
                 
                 for i, page in enumerate(pdf.pages):
-                    # Update progress
-                    progress = (i + 1) / total_pages
-                    progress_bar.progress(progress)
-                    status_text.text(f"Processing page {i + 1} of {total_pages}")
                     
-                    # Extract text from current page
+                    if not st.session_state.get('pdf_processed', False):
+                        progress = (i + 1) / total_pages
+                        progress_bar.progress(progress)
+                        status_text.text(f"Processing page {i + 1} of {total_pages}")
+                    
+                    
                     page_text = page.extract_text()
                     if page_text:
                         extracted_text += page_text + "\n\n"
                 
-                # Clear progress indicators
-                progress_bar.empty()
-                status_text.empty()
+                
+                if not st.session_state.get('pdf_processed', False):
+                    progress_bar.empty()
+                    status_text.empty()
             
             if not extracted_text.strip():
                 raise ValueError("No text could be extracted from the PDF")
@@ -65,19 +71,19 @@ class PDFProcessor:
         Returns:
             str: Cleaned text
         """
-        # Remove excessive whitespace
+        
         lines = text.split('\n')
         cleaned_lines = []
         
         for line in lines:
             line = line.strip()
-            if line:  # Only keep non-empty lines
+            if line:  
                 cleaned_lines.append(line)
         
-        # Join lines with single newlines
+        
         cleaned_text = '\n'.join(cleaned_lines)
         
-        # Remove multiple consecutive newlines
+        
         while '\n\n\n' in cleaned_text:
             cleaned_text = cleaned_text.replace('\n\n\n', '\n\n')
         

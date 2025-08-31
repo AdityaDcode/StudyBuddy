@@ -5,57 +5,92 @@ from utils.gemini_client import GeminiClient
 from utils.quiz_generator import QuizGenerator
 from utils.chat_manager import ChatManager
 
-# Page configuration
+
 st.set_page_config(
     page_title="Smart Study Buddy",
-    page_icon="📚",
+    page_icon="",
     layout="wide",
     initial_sidebar_state="expanded"
 )
 
-# Custom CSS for better styling
+
 st.markdown("""
 <style>
-    .main-header {
-        background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
-        padding: 2rem;
-        border-radius: 10px;
-        margin-bottom: 2rem;
-        text-align: center;
-        color: white;
-    }
-    
-    .feature-card {
-        background: #f8f9fa;
-        padding: 1.5rem;
-        border-radius: 10px;
-        border-left: 4px solid #667eea;
-        margin: 1rem 0;
-    }
-    
-    .chat-message {
-        padding: 1rem;
-        margin: 0.5rem 0;
-        border-radius: 10px;
-    }
-    
-    .user-message {
-        background-color: #e3f2fd;
-        margin-left: 2rem;
-    }
-    
-    .ai-message {
-        background-color: #f1f8e9;
-        margin-right: 2rem;
-    }
-    
-    .quiz-container {
-        background: #ffffff;
-        padding: 2rem;
-        border-radius: 10px;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        margin: 1rem 0;
-    }
+.main-header {
+    background: linear-gradient(90deg, #ffb347 0%, #ffcc33 100%); /* warmer, more natural gradient */
+    padding: 2rem;
+    border-radius: 12px;
+    margin-bottom: 2rem;
+    text-align: center;
+    color: #333; /* soft dark text instead of stark white */
+    font-family: 'Segoe UI', sans-serif;
+}
+
+.feature-card-container {
+    display: flex;
+    flex-wrap: wrap; /* wrap to next line on smaller screens */
+    gap: 1rem;       /* spacing between cards */
+    justify-content: center; /* center horizontally */
+    margin: 1rem 0;
+}
+
+.feature-card {
+    background: #fff7f0; /* soft peach tone */
+    padding: 0.8rem 1rem; /* smaller padding */
+    border-radius: 10px;
+    border-left: 4px solid #ffb347; /* accent color */
+    box-shadow: 0 1.5px 4px rgba(0,0,0,0.06); /* subtle shadow */
+    flex: 1 1 200px; /* responsive width, min 200px */
+    max-width: 250px; /* prevent cards from being too wide */
+    text-align: center;
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.feature-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 3px 8px rgba(0,0,0,0.1);
+}
+
+.feature-card h3 {
+    font-size: 1rem;
+    margin-bottom: 0.3rem;
+    color: #2c3e50;
+}
+
+.feature-card p {
+    font-size: 0.85rem;
+    color: #555;
+    margin: 0;
+}
+
+
+.chat-message {
+    padding: 1rem;
+    margin: 0.5rem 0;
+    border-radius: 12px;
+    font-size: 0.95rem;
+    line-height: 1.4;
+}
+
+.user-message {
+    background-color: #d1f4ff; /* soft sky blue */
+    margin-left: 2rem;
+}
+
+.ai-message {
+    background-color: #e6f9f0; /* soft mint green */
+    margin-right: 2rem;
+}
+
+.quiz-container {
+    background: #ffffff;
+    padding: 2rem;
+    border-radius: 12px;
+    box-shadow: 0 3px 8px rgba(0,0,0,0.12); /* slightly stronger shadow for depth */
+    margin: 1rem 0;
+    border: 1px solid #f0f0f0; /* subtle border for separation */
+}
+
 </style>
 """, unsafe_allow_html=True)
 
@@ -63,6 +98,10 @@ def initialize_session_state():
     """Initialize session state variables"""
     if 'pdf_text' not in st.session_state:
         st.session_state.pdf_text = ""
+    if 'pdf_processed' not in st.session_state:
+        st.session_state.pdf_processed = False
+    if 'uploaded_file_name' not in st.session_state:
+        st.session_state.uploaded_file_name = None
     if 'chat_history' not in st.session_state:
         st.session_state.chat_history = []
     if 'quiz_questions' not in st.session_state:
@@ -76,10 +115,10 @@ def initialize_session_state():
 
 def main():
     """Main application function"""
-    # Initialize session state
+    
     initialize_session_state()
     
-    # Initialize components with API key
+
     api_key = "AIzaSyDax4YAYQpefwYh-3Cfuada-nkCqbR6EJk"
     
     pdf_processor = PDFProcessor()
@@ -87,17 +126,17 @@ def main():
     quiz_generator = QuizGenerator(gemini_client)
     chat_manager = ChatManager(gemini_client)
     
-    # Header
+    
     st.markdown("""
     <div class="main-header">
-        <h1>📚 Smart Study Buddy</h1>
+        <h1>Smart Study Buddy</h1>
         <p>AI-Powered PDF Chat & Quiz Generator</p>
     </div>
     """, unsafe_allow_html=True)
     
-    # Sidebar for PDF upload and settings
+    
     with st.sidebar:
-        st.header("📄 Upload Your Study Material")
+        st.header("Upload Your Study Material")
         uploaded_file = st.file_uploader(
             "Choose a PDF file",
             type="pdf",
@@ -105,38 +144,50 @@ def main():
         )
         
         if uploaded_file is not None:
-            with st.spinner("Processing PDF..."):
-                try:
-                    # Process the uploaded PDF
-                    pdf_text = pdf_processor.extract_text(uploaded_file)
-                    st.session_state.pdf_text = pdf_text
-                    
-                    # Display PDF info
-                    st.success("✅ PDF processed successfully!")
-                    st.info(f"📊 Extracted {len(pdf_text.split())} words")
-                    
-                    # Show preview of extracted text
-                    with st.expander("📖 Text Preview"):
-                        st.text_area(
-                            "First 500 characters:",
-                            pdf_text[:500] + "..." if len(pdf_text) > 500 else pdf_text,
-                            height=200,
-                            disabled=True
-                        )
+            
+            if (not st.session_state.pdf_processed or 
+                st.session_state.uploaded_file_name != uploaded_file.name):
+                
+                with st.spinner("Processing PDF..."):
+                    try:
                         
-                except Exception as e:
-                    st.error(f"❌ Error processing PDF: {str(e)}")
+                        pdf_text = pdf_processor.extract_text(uploaded_file)
+                        st.session_state.pdf_text = pdf_text
+                        st.session_state.pdf_processed = True
+                        st.session_state.uploaded_file_name = uploaded_file.name
+                        
+                        
+                        st.success("PDF processed successfully!")
+                        
+                    except Exception as e:
+                        st.error(f"Error processing PDF: {str(e)}")
+                        st.session_state.pdf_processed = False
+            
+            
+            if st.session_state.pdf_processed:
+                st.success("PDF ready!")
+                st.info(f"Extracted {len(st.session_state.pdf_text.split())} words")
+                
+                
+                with st.expander("Text Preview"):
+                    st.text_area(
+                        "First 500 characters:",
+                        st.session_state.pdf_text[:500] + "..." if len(st.session_state.pdf_text) > 500 else st.session_state.pdf_text,
+                        height=200,
+                        disabled=True
+                    )
         
-        # Clear session button
-        if st.button("🔄 Clear Session", type="secondary"):
+        
+        if st.button("Clear Session", type="secondary"):
             for key in list(st.session_state.keys()):
                 del st.session_state[key]
+            initialize_session_state()
             st.rerun()
     
-    # Main content area
+    
     if st.session_state.pdf_text:
-        # Create tabs for different features
-        tab1, tab2, tab3 = st.tabs(["💬 Chat with PDF", "🧠 Generate Quiz", "📊 Quiz Results"])
+        
+        tab1, tab2, tab3 = st.tabs(["Chat with PDF", "Generate Quiz", "Quiz Results"])
         
         with tab1:
             chat_interface(chat_manager)
@@ -148,47 +199,58 @@ def main():
             quiz_results_interface()
     
     else:
-        # Welcome screen when no PDF is uploaded
+        
         welcome_screen()
 
 def welcome_screen():
     """Display welcome screen when no PDF is uploaded"""
-    col1, col2, col3 = st.columns([1, 2, 1])
     
-    with col2:
-        st.markdown("""
-        <div class="feature-card">
-            <h2>🎯 Welcome to Smart Study Buddy!</h2>
-            <p>Transform your study experience with AI-powered learning tools.</p>
-        </div>
-        """, unsafe_allow_html=True)
-        
-        # Feature highlights
-        st.markdown("### ✨ Features")
-        
-        features = [
-            ("📄 PDF Processing", "Upload and extract text from your study materials"),
-            ("💬 AI Chat", "Ask questions about your PDF content and get instant answers"),
-            ("🧠 Quiz Generation", "Generate custom quizzes to test your knowledge"),
-            ("📊 Progress Tracking", "Track your quiz performance and learning progress")
-        ]
-        
-        for title, description in features:
+
+    st.markdown("<h1 style='text-align:center; color:#333;'>Welcome to Smart Study Buddy!</h1>", unsafe_allow_html=True)
+    st.markdown("<p style='text-align:center; color:#555; font-size:1rem;'>Transform your study experience with AI-powered learning tools.</p>", unsafe_allow_html=True)
+    
+    st.markdown("<h3 style='margin-top:2rem; margin-bottom:1rem;'>Features</h3>", unsafe_allow_html=True)
+    
+    
+    features = [
+        ("PDF Processing", "Upload and extract text from your study materials"),
+        ("AI Chat", "Ask questions about your PDF content and get instant answers"),
+        ("Quiz Generation", "Generate custom quizzes to test your knowledge"),
+        ("Progress Tracking", "Track your quiz performance and learning progress")
+    ]
+    
+    
+    cols = st.columns(len(features))
+    
+    
+    card_style = """
+        style="
+            margin-bottom: 1rem; 
+            min-height: 150px; 
+            display: flex; 
+            flex-direction: column; 
+            justify-content: center;
+            background: #fff7f0; 
+            border-left: 5px solid #ffb347; 
+            border-radius:12px;
+            padding:1rem;
+            text-align:center;"
+    """
+    
+    for i, (title, description) in enumerate(features):
+        with cols[i]:
             st.markdown(f"""
-            <div class="feature-card">
-                <h4>{title}</h4>
-                <p>{description}</p>
+            <div {card_style}>
+                <h4 style="color:#ff8c42;">{title}</h4>
+                <p style="color:#555; font-size:0.95rem;">{description}</p>
             </div>
             """, unsafe_allow_html=True)
-        
-        st.markdown("### 🚀 Get Started")
-        st.info("👈 Upload a PDF file in the sidebar to begin your AI-powered study session!")
 
 def chat_interface(chat_manager):
     """Chat interface for interacting with PDF content"""
-    st.header("💬 Chat with Your PDF")
+    st.header("Chat with Your PDF")
     
-    # Display chat history
+    
     chat_container = st.container()
     
     with chat_container:
@@ -206,7 +268,7 @@ def chat_interface(chat_manager):
                 </div>
                 """, unsafe_allow_html=True)
     
-    # Chat input
+    
     user_question = st.text_input(
         "Ask a question about your PDF:",
         placeholder="e.g., What are the main concepts discussed in chapter 3?",
@@ -216,15 +278,15 @@ def chat_interface(chat_manager):
     col1, col2 = st.columns([1, 4])
     
     with col1:
-        if st.button("Send 📤", type="primary"):
+        if st.button("Send", type="primary"):
             if user_question.strip():
-                # Add user message to history
+                
                 st.session_state.chat_history.append({
                     "role": "user",
                     "content": user_question
                 })
                 
-                # Get AI response
+                
                 with st.spinner("🤔 Thinking..."):
                     try:
                         response = chat_manager.get_response(
@@ -232,7 +294,7 @@ def chat_interface(chat_manager):
                             st.session_state.pdf_text
                         )
                         
-                        # Add AI response to history
+                        
                         st.session_state.chat_history.append({
                             "role": "assistant",
                             "content": response
@@ -241,55 +303,65 @@ def chat_interface(chat_manager):
                         st.rerun()
                         
                     except Exception as e:
-                        st.error(f"❌ Error getting response: {str(e)}")
+                        st.error(f" Error getting response: {str(e)}")
     
     with col2:
-        if st.button("Clear Chat 🗑️", type="secondary"):
+        if st.button("Clear Chat", type="secondary"):
             st.session_state.chat_history = []
             st.rerun()
 
 def quiz_interface(quiz_generator):
     """Quiz generation and taking interface"""
-    st.header("🧠 Generate Quiz from Your PDF")
+    st.header("Generate Quiz from Your PDF")
+
     
-    col1, col2 = st.columns([2, 1])
+    st.text("MCQs and Short Answers")  
+
     
-    with col1:
-        quiz_type = st.selectbox(
-            "Select Quiz Type:",
-            ["Multiple Choice", "Short Answer", "Mixed"],
-            help="Choose the type of quiz you want to generate"
-        )
-    
-    with col2:
-        num_questions = st.slider(
-            "Number of Questions:",
-            min_value=3,
-            max_value=10,
-            value=5,
-            help="Select how many questions to generate"
-        )
-    
-    if st.button("🎯 Generate Quiz", type="primary"):
-        with st.spinner("🎲 Generating quiz questions..."):
+    num_questions = st.slider(
+        "Number of Questions:",
+        min_value=3,
+        max_value=10,
+        value=5,
+        help="Select how many questions to generate"
+    )
+
+    if st.button("Generate Quiz", type="primary"):
+        with st.spinner("Generating quiz questions..."):
             try:
-                questions = quiz_generator.generate_quiz(
-                    st.session_state.pdf_text,
-                    quiz_type.lower().replace(" ", "_"),
-                    num_questions
-                )
                 
-                st.session_state.quiz_questions = questions
+                num_mcq = num_questions // 2
+                num_short = num_questions - num_mcq
+
+                
+                mcq_questions = quiz_generator.generate_quiz(
+                    st.session_state.pdf_text,
+                    quiz_type='multiple_choice',
+                    num_questions=num_mcq
+                )
+
+                
+                short_questions = quiz_generator.generate_quiz(
+                    st.session_state.pdf_text,
+                    quiz_type='short_answer',
+                    num_questions=num_short
+                )
+
+                
+                all_questions = mcq_questions + short_questions
+
+                
+                st.session_state.quiz_questions = all_questions
                 st.session_state.current_quiz_index = 0
                 st.session_state.quiz_answers = {}
                 st.session_state.quiz_score = 0
-                
-                st.success(f"✅ Generated {len(questions)} questions!")
-                
+
+                st.success(f"Generated {len(all_questions)} questions ({num_mcq} MCQs + {num_short} Short Answers)!")
+
             except Exception as e:
-                st.error(f"❌ Error generating quiz: {str(e)}")
+                st.error(f"Error generating quiz: {str(e)}")
+
     
-    # Display quiz questions if available
     if st.session_state.quiz_questions:
         display_quiz()
 
@@ -309,7 +381,7 @@ def display_quiz():
         
         st.markdown(f"**{question['question']}**")
         
-        # Handle different question types
+        
         if question['type'] == 'multiple_choice':
             answer = st.radio(
                 "Choose your answer:",
@@ -317,53 +389,53 @@ def display_quiz():
                 key=f"q_{current_index}"
             )
             
-            if st.button("Submit Answer ✅", key=f"submit_{current_index}"):
+            if st.button("Submit Answer", key=f"submit_{current_index}"):
                 st.session_state.quiz_answers[current_index] = answer
                 
-                # Check if answer is correct
+                
                 if answer == question['correct_answer']:
-                    st.success("🎉 Correct!")
+                    st.success("Correct!")
                     st.session_state.quiz_score += 1
                 else:
-                    st.error(f"❌ Incorrect. The correct answer is: {question['correct_answer']}")
+                    st.error(f" Incorrect. The correct answer is: {question['correct_answer']}")
                 
-                # Show explanation if available
+                
                 if 'explanation' in question:
-                    st.info(f"💡 Explanation: {question['explanation']}")
+                    st.info(f"Explanation: {question['explanation']}")
                 
-                # Move to next question
+                
                 st.session_state.current_quiz_index += 1
                 st.rerun()
         
-        else:  # Short answer
+        else:  
             answer = st.text_area(
                 "Your answer:",
                 key=f"q_{current_index}",
                 height=100
             )
             
-            if st.button("Submit Answer ✅", key=f"submit_{current_index}"):
+            if st.button("Submit Answer ", key=f"submit_{current_index}"):
                 st.session_state.quiz_answers[current_index] = answer
                 
-                # For short answers, show the expected answer
-                st.info(f"💡 Expected answer: {question['expected_answer']}")
                 
-                # Move to next question
+                st.info(f"Expected answer: {question['expected_answer']}")
+                
+                
                 st.session_state.current_quiz_index += 1
                 st.rerun()
     
     else:
-        # Quiz completed
-        st.balloons()
-        st.success("🎊 Quiz Completed!")
         
-        # Calculate score for multiple choice questions
+        st.balloons()
+        st.success(" Quiz Completed!")
+        
+        
         mc_questions = [q for q in questions if q['type'] == 'multiple_choice']
         if mc_questions:
             percentage = (st.session_state.quiz_score / len(mc_questions)) * 100
             st.metric("Your Score", f"{st.session_state.quiz_score}/{len(mc_questions)}", f"{percentage:.1f}%")
         
-        if st.button("🔄 Retake Quiz"):
+        if st.button("Retake Quiz"):
             st.session_state.current_quiz_index = 0
             st.session_state.quiz_answers = {}
             st.session_state.quiz_score = 0
@@ -371,10 +443,10 @@ def display_quiz():
 
 def quiz_results_interface():
     """Display quiz results and analytics"""
-    st.header("📊 Quiz Results & Progress")
+    st.header("Quiz Results & Progress")
     
     if st.session_state.quiz_questions and st.session_state.quiz_answers:
-        # Overall statistics
+        
         total_questions = len(st.session_state.quiz_questions)
         answered_questions = len(st.session_state.quiz_answers)
         
@@ -393,7 +465,7 @@ def quiz_results_interface():
                     percentage = (st.session_state.quiz_score / len(mc_questions)) * 100
                     st.metric("Score", f"{percentage:.1f}%")
         
-        # Detailed results
+        
         st.subheader("📝 Detailed Results")
         
         for i, question in enumerate(st.session_state.quiz_questions):
@@ -405,7 +477,7 @@ def quiz_results_interface():
                     if question['type'] == 'multiple_choice':
                         st.write(f"**Correct Answer:** {question['correct_answer']}")
                         is_correct = st.session_state.quiz_answers[i] == question['correct_answer']
-                        st.write(f"**Result:** {'✅ Correct' if is_correct else '❌ Incorrect'}")
+                        st.write(f"**Result:** {'Correct' if is_correct else ' Incorrect'}")
                     else:
                         st.write(f"**Expected Answer:** {question['expected_answer']}")
                     
@@ -413,12 +485,12 @@ def quiz_results_interface():
                         st.write(f"**Explanation:** {question['explanation']}")
     
     else:
-        st.info("🎯 Complete a quiz to see your results here!")
+        st.info("Complete a quiz to see your results here!")
         
-        # Study tips
+        
         st.markdown("""
         <div class="feature-card">
-            <h3>📈 Study Tips</h3>
+            <h3> Study Tips</h3>
             <ul>
                 <li>Review the PDF content thoroughly before taking quizzes</li>
                 <li>Use the chat feature to clarify difficult concepts</li>

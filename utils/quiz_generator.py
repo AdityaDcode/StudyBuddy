@@ -32,19 +32,19 @@ class QuizGenerator:
             list: List of quiz questions
         """
         try:
-            # Validate inputs
+            
             if not pdf_content.strip():
                 raise ValueError("PDF content is empty")
             
             if num_questions < 1 or num_questions > 10:
                 raise ValueError("Number of questions must be between 1 and 10")
             
-            # Generate quiz content using Gemini
+            
             quiz_response = self.gemini_client.generate_quiz_content(
                 pdf_content, quiz_type, num_questions
             )
             
-            # Parse the response to extract questions
+            
             questions = self._parse_quiz_response(quiz_response, quiz_type, num_questions)
             
             return questions
@@ -65,23 +65,23 @@ class QuizGenerator:
             list: Parsed quiz questions
         """
         try:
-            # Try to extract JSON from the response
+            
             json_match = re.search(r'\[.*\]', response, re.DOTALL)
             
             if json_match:
                 json_str = json_match.group()
                 questions = json.loads(json_str)
             else:
-                # Fallback: create questions from text response
+                
                 questions = self._create_fallback_questions(response, quiz_type, num_questions)
             
-            # Validate and clean questions
+            
             validated_questions = self._validate_questions(questions, num_questions)
             
             return validated_questions
             
         except json.JSONDecodeError:
-            # If JSON parsing fails, create fallback questions
+            
             return self._create_fallback_questions(response, quiz_type, num_questions)
     
     def _validate_questions(self, questions, expected_count):
@@ -101,24 +101,24 @@ class QuizGenerator:
             if i >= expected_count:
                 break
                 
-            # Ensure required fields exist
+            
             if 'question' not in question or 'type' not in question:
                 continue
             
-            # Validate multiple choice questions
+            
             if question['type'] == 'multiple_choice':
                 if 'options' not in question or 'correct_answer' not in question:
                     continue
                 
-                # Ensure we have 4 options
+                
                 if len(question['options']) < 2:
                     continue
                 
-                # Ensure correct answer is in options
+                
                 if question['correct_answer'] not in question['options']:
                     question['correct_answer'] = question['options'][0]
             
-            # Validate short answer questions
+            
             elif question['type'] == 'short_answer':
                 if 'expected_answer' not in question:
                     question['expected_answer'] = "Answer not provided"
@@ -141,7 +141,7 @@ class QuizGenerator:
         """
         questions = []
         
-        # Create simple questions based on the response
+        
         lines = response.split('\n')
         question_lines = [line for line in lines if '?' in line]
         
@@ -161,7 +161,7 @@ class QuizGenerator:
                     'expected_answer': 'Please refer to the study material for the complete answer.'
                 })
         
-        # If no questions generated, create at least one
+        
         if not questions:
             questions.append({
                 'question': 'What are the main topics covered in this study material?',
@@ -185,7 +185,7 @@ class QuizGenerator:
         total_questions = len(questions)
         answered_questions = len(answers)
         
-        # Calculate score for multiple choice questions
+        
         correct_answers = 0
         mc_questions = 0
         

@@ -1,4 +1,5 @@
 import streamlit as st
+import hashlib
 
 class ChatManager:
     """Manages chat functionality and conversation history"""
@@ -12,6 +13,8 @@ class ChatManager:
         """
         self.gemini_client = gemini_client
         self.max_history_length = 10  # Limit chat history to prevent token overflow
+        self.pdf_cache = {}  # Cache for PDF key points
+        self.cache_ttl = 3600  # Cache TTL in seconds (1 hour)
     
     def get_response(self, user_question, pdf_content):
         """
@@ -46,6 +49,55 @@ class ChatManager:
         except Exception as e:
             raise Exception(f"Failed to get chat response: {str(e)}")
     
+    def _extract_key_points(self, pdf_content):
+        """
+        Extract key points from PDF content and cache them
+        
+        Args:
+            pdf_content (str): Full PDF text content
+            
+        Returns:
+            str: Extracted key points
+        """
+        # Create a hash of the PDF content for caching
+        pdf_hash = hashlib.md5(pdf_content.encode()).hexdigest()
+        
+        # Check if we have cached key points for this PDF
+        if pdf_hash in self.pdf_cache:
+            cached_data = self.pdf_cache[pdf_hash]
+            return cached_data["key_points"]
+        
+        
+        try:
+            prompt = f"""
+            Extract the key points, main concepts, and important information from the following document.
+            Organize the information in a clear, structured way that would be useful for studying.
+            
+            Document:
+            {pdf_content[:4000]}  # Limit to avoid token limits
+            
+            Please provide:
+            1. Main topics covered
+            2. Key concepts and definitions
+            3. Important facts or figures
+            4. Any notable examples or case studies
+            5. Summary of each major section
+            
+            Format the response in a clear, organized manner.
+            """
+            
+            key_points = self.gemini_client.generate_response(prompt)
+            
+            # Cache the key points
+            self.pdf_cache[pdf_hash] = {
+                "key_points": key_points,
+            }
+            
+            return key_points
+        except Exception as e:
+            # If key point extraction fails, fall back to using truncated PDF content
+            return pdf_content[:2000]  # Use less content as fallback
+    
     def _build_chat_context(self, pdf_content):
         """
         Build context from PDF content and recent chat history
@@ -58,15 +110,16 @@ class ChatManager:
         """
         context_parts = []
         
-        # Add PDF content (truncated to avoid token limits)
+        # Add PDF key points (cached) instead of full content
         if pdf_content:
-            context_parts.append(f"Document Content:\n{pdf_content[:3000]}")
+            key_points = self._extract_key_points(pdf_content)
+            context_parts.append(f"Document Key Points:\n{key_points[:2000]}")  # Limit key points
         
         # Add recent chat history for context
         if st.session_state.chat_history:
             recent_history = st.session_state.chat_history[-6:]  # Last 3 exchanges
             history_text = "\n".join([
-                f"{msg['role'].capitalize()}: {msg['content']}" 
+                f"{msg['role'].capitalize()}: {msg['content']}"
                 for msg in recent_history
             ])
             context_parts.append(f"Recent Conversation:\n{history_text}")
@@ -85,8 +138,8 @@ class ChatManager:
             str: Complete prompt for AI
         """
         return f"""
-        You are an intelligent study assistant helping a student understand their study material. 
-        You have access to their uploaded document and conversation history.
+        You are an intelligent study assistant helping a student understand their study material.
+        You have access to key points from their uploaded document and conversation history.
         
         Context:
         {context}
@@ -94,7 +147,7 @@ class ChatManager:
         Student Question: {user_question}
         
         Instructions:
-        - Answer the question based on the provided document content when possible
+        - Answer the question based on the provided document key points when possible
         - If the answer isn't in the document, clearly mention this and provide general knowledge
         - Be educational and encouraging in your tone
         - Provide examples and explanations to help understanding
@@ -129,6 +182,10 @@ class ChatManager:
     def clear_history(self):
         """Clear chat history"""
         st.session_state.chat_history = []
+    
+    def clear_cache(self):
+        """Clear PDF cache"""
+        self.pdf_cache = {}
     
     def get_conversation_summary(self):
         """
